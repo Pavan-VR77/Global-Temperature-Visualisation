@@ -12,15 +12,21 @@
 </head>
 
 <body>
-    <!-- <h1>
-        Dashboard For Final Project
-    </h1> -->
     <div class="main-container">
         <div class="vis-container">
-            <div class="card card-container flex-row m-4">
+            <div class="card card-container flex-row m-2">
                 <div id="geoMap"></div>
             </div>
-            <div id="barchart-averages"></div>
+            <div class="barchart-container">
+                <div class="card card-container m-2 average-barchart-container">
+                    <div id="barchart-averages"></div>
+                </div>
+
+                <div class="card card-container m-2 average-barchart-container">
+                    <div id="rcp-barchart"></div>
+                </div>
+            </div>
+          
         </div>
 
         <div class="interaction-panel card card-container">
@@ -34,7 +40,8 @@
         integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
         crossorigin="anonymous"></script>
 
-    <script src="js/barChart.js"></script>
+    <script src="js/AverageTemperatureBarChart.js"></script>
+    <script src="js/rcpBarChart.js"></script>
     <script src="js/geomap.js"></script>
 </body>
 
