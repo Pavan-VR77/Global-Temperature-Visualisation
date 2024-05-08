@@ -171,7 +171,10 @@ class GeoMapVisualization {
       .join("path")
       .attr("d", path)
       .attr("fill", (d) => {
-        const countryName = d.properties.name;
+        const countryName =
+          d.properties.name == "Russia"
+            ? "Russian Federation"
+            : d.properties.name;
 
         if (vis.fitleredData == null) {
           return "#FF0";
@@ -199,16 +202,20 @@ class GeoMapVisualization {
       .on("mouseover", function (event, d) {
         d3.select(this).attr("stroke-width", 3);
         d3.select(this).attr("opacity", 1);
+        const countryName =
+          d.properties.name == "Russia"
+            ? "Russian Federation"
+            : d.properties.name;
         const countryData =
-          vis.fitleredData && d.properties.name in vis.fitleredData
-            ? vis.fitleredData[d.properties.name]
+          vis.fitleredData && countryName in vis.fitleredData
+            ? vis.fitleredData[countryName]
             : null;
 
         if (countryData) {
           vis.tooltip
             .style("visibility", "visible")
             .html(
-              `<div><strong>Country:</strong> ${d.properties.name}<br>
+              `<div><strong>Country:</strong> ${countryName}<br>
                  <strong>Temperature:</strong> ${countryData["Temperature"]} <br>
                  <strong>Emissions:</strong>  ${countryData["Emissions"]}<br>
                  <strong>Time Period:</strong> ${countryData["Time Period"]} <br>
