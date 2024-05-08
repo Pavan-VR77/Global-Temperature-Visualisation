@@ -7,6 +7,15 @@ body {
     background: #f7f7f7 !important;
 }
 
+.header {
+    background-color: #35495e;  
+    color: #ffffff;             
+    padding: 20px;              
+    text-align: center;         
+    font-family: 'Arial', sans-serif; 
+    border-bottom: 2px solid #a8a8ac; 
+}
+
 .main-container {
     display: flex;
     flex-direction: row;
@@ -75,13 +84,6 @@ h1 {
     font-weight: bold;
 }
 
-#barchart-averages {
-    width: 100%; /* or the width you want the visible area to be */
-    overflow-x: scroll; /* enables horizontal scrolling */
-    white-space: nowrap; /* ensures the SVG does not wrap */
-  }
-
-
  .card-container {
     border-radius: 5px;
     box-shadow: 0 0 5px 0 rgba(43, 43, 43, 0.1),
@@ -97,3 +99,10 @@ h1 {
     display: flex;
     flex-direction: row;
   }
+
+  .tooltip {
+    pointer-events: none; /* Let mouse events pass through */
+    opacity: 0.9 !important;
+    z-index: 10; /* Make sure it's on top */
+  }
+  

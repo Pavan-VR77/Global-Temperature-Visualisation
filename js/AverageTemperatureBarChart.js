@@ -1,9 +1,3 @@
-/**
- * Assignment name: Lab 6 - bar chart
- * First name: Pavan
- * Last name: Vanjre Ravindranath
- * Student ID: 801352266
- */
 class AverageTemperatureBarChart {
   /**
    * class constructor with basic chart configuration
@@ -17,11 +11,12 @@ class AverageTemperatureBarChart {
       containerWidth: _config.containerWidth || 500,
       containerHeight: _config.containerHeight || 140,
       margin: _config.margin || { top: 5, right: 5, bottom: 20, left: 50 },
+      selectedFilters: _config.selectedFilters,
     };
     this.data = _data;
-    this.selectedCountry = "United States of America";
-    this.timePeriod = "End of Century 2080-2099";
-    this.rcp = "RCP 4.5";
+    this.selectedCountry = this.config.selectedFilters.Country;
+    this.timePeriod = this.config.selectedFilters["Time Period"];
+    this.rcp = this.config.selectedFilters["Emission Rate"];
     this.initVis();
   }
 
@@ -40,9 +35,8 @@ class AverageTemperatureBarChart {
       vis.config.margin.top -
       vis.config.margin.bottom;
 
-    const totalWidth = vis.width * 6;
     let averageTemparutePercentileData = {};
-    let filteredData = {};
+
     averageTemparutePercentileData = this.data.filter(
       (item) =>
         item["Country"] === this.selectedCountry &&
@@ -51,15 +45,12 @@ class AverageTemperatureBarChart {
         item["Time Period"] === this.timePeriod &&
         item["Emission Rate"] === this.rcp
     );
-    console.log(
-      "averageTemparutePercentileData",
-      averageTemparutePercentileData
-    );
 
     d3.select(vis.config.parentElement)
-      .append("h2")
+      .append("h6")
       .style("text-align", "center")
-      .text("Bar Chart");
+      .style("margin-top", "1rem")
+      .text("Percentile Comparison between Summer and Winter Temperatures");
 
     vis.svg = d3
       .select(vis.config.parentElement)
@@ -69,37 +60,32 @@ class AverageTemperatureBarChart {
       .style("display", "block")
       .attr("id", "barchart");
 
-    vis.chart = vis.svg
+    vis.chart = vis.svg.append("g").attr("transform", `translate(15 ,50)`);
+
+    vis.xAxis = vis.chart
       .append("g")
-      .attr(
-        "transform",
-        `translate(${vis.config.margin.left + 30} ,${vis.config.margin.top})`
-      );
+      .attr("transform", `translate(15,${vis.height})`);
 
-    vis.xAxis = vis.svg
-      .append("g")
-      .attr("transform", `translate(30,${vis.height + 5})`);
+    vis.yAxis = vis.chart.append("g").attr("transform", `translate(15,0)`);
 
-    vis.yAxis = vis.svg.append("g").attr("transform", `translate(30,0)`);
-
-    this.updateVis();
+    this.update(this.config.selectedFilters);
   }
 
   /**
    * this function is used to prepare the data and update the scales before we render the actual vis
    */
-  updateVis() {
+  update(currentFilters) {
     let vis = this;
     let categories = ["P5th", "P50th", "P95th"];
     let groups = ["Summer", "Winter"];
 
     let filteredData = this.data.filter(
       (item) =>
-        item["Country"] === this.selectedCountry &&
+        item["Country"] === currentFilters["Country"] &&
         (item["Category"] === "Temp - Summer Average" ||
           item["Category"] === "Temp - Winter Average") &&
-        item["Time Period"] === this.timePeriod &&
-        item["Emission Rate"] === this.rcp
+        item["Time Period"] === currentFilters["Time Period"] &&
+        item["Emission Rate"] === currentFilters["Emission Rate"]
     );
 
     // Prepare the data for the bar groups
@@ -117,7 +103,7 @@ class AverageTemperatureBarChart {
         }));
       })
       .flat();
-    console.log("preparedData", preparedData);
+
     if (preparedData.length === 0) {
       console.error("No data available to render the chart.");
       return; // Exit if no data to render
@@ -139,14 +125,14 @@ class AverageTemperatureBarChart {
     vis.yAxis.call(d3.axisLeft(vis.yScale));
 
     // Bind data and create bars
-    let bars = vis.svg
+    let bars = vis.chart
       .selectAll(".bar")
       .data(preparedData)
       .join("rect")
       .attr("class", "bar")
-      .attr("x", (d) => 30 + vis.xScale(`${d.group} ${d.category}`))
+      .attr("x", (d) => 15 + vis.xScale(`${d.group} ${d.category}`))
       .attr("width", vis.xScale.bandwidth() - 2)
-      .attr("y", (d) => vis.yScale(d.value))
+      .attr("y", (d) => vis.yScale(d.value) - 5)
       .attr("height", (d) => vis.height - vis.yScale(d.value))
       .attr("fill", (d) => (d.group === "Summer" ? "orange" : "steelblue"));
   }

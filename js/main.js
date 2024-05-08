@@ -6,6 +6,7 @@ let currentFilters = {
   "Time Period": "Historical 1986-2005",
   temperatureScale: "Celsius",
   Probability: "Median",
+  Country: "United States of America",
 };
 
 const probabilityMapping = {
@@ -37,16 +38,27 @@ function setupVisualizations(mainData, geojsonData) {
     containerWidth: 600,
     containerHeight: 400,
     margin: { top: 30, right: 30, bottom: 60, left: 50 },
+    selectedFilters: currentFilters,
   };
 
+  const rcpBarChartConfig = {
+    parentElement: "#rcp-barchart",
+    containerWidth: 500,
+    containerHeight: 400,
+    margin: { top: 30, right: 30, bottom: 60, left: 50 },
+    selectedFilters: currentFilters,
+  };
   const geoMap = new GeoMapVisualization(geoMapConfig, mainData, geojsonData);
   const barChart = new AverageTemperatureBarChart(barChartConfig, mainData);
+  const rcpBarChart = new RCPBarChart(rcpBarChartConfig, mainData);
 
-  createInteractionPanel(mainData, geoMap, barChart);
-  updateVisualizations(geoMap, barChart); // Call this function here to apply the default filter immediately
+  createInteractionPanel(mainData, geoMap, barChart, rcpBarChart);
+  setTimeout(function () {
+    updateVisualizations(geoMap, barChart, rcpBarChart);
+  }, 2000);
 }
 
-function createInteractionPanel(data, geoMap, barChart) {
+function createInteractionPanel(data, geoMap, barChart, rcpBarChart) {
   // Creating multiple dropdowns for different types of data filters
   createDropdown(
     "categorySelect",
@@ -54,8 +66,9 @@ function createInteractionPanel(data, geoMap, barChart) {
     [...new Set(data.map((item) => item["Select Category"]))],
     geoMap,
     barChart,
+    rcpBarChart,
     "Select Category",
-    "Average Dec/Jan/Feb Temps"
+    true
   );
   createDropdown(
     "emissionSelect",
@@ -63,8 +76,9 @@ function createInteractionPanel(data, geoMap, barChart) {
     [...new Set(data.map((item) => item["Emission Rate"]))],
     geoMap,
     barChart,
+    rcpBarChart,
     "Emission Rate",
-    "RCP 8.5"
+    true
   );
   createDropdown(
     "timePeriodSelect",
@@ -72,8 +86,9 @@ function createInteractionPanel(data, geoMap, barChart) {
     [...new Set(data.map((item) => item["Time Period"]))],
     geoMap,
     barChart,
+    rcpBarChart,
     "Time Period",
-    "Historical 1986-2005"
+    true
   );
   createDropdown(
     "temperatureScaleSelect",
@@ -81,8 +96,9 @@ function createInteractionPanel(data, geoMap, barChart) {
     ["Celsius", "Fahrenheit"],
     geoMap,
     barChart,
+    rcpBarChart,
     "temperatureScale",
-    "Celsius"
+    true
   );
   createDropdown(
     "probabilitySelect",
@@ -90,15 +106,36 @@ function createInteractionPanel(data, geoMap, barChart) {
     ["1-In-2 Low", "Median", "1-In-20 High"],
     geoMap,
     barChart,
+    rcpBarChart,
     "probability",
-    "Median"
+    true
+  );
+
+  createDropdown(
+    "CountrySelect",
+    "Select Country",
+    [...new Set(data.map((item) => item["Country"]))],
+    geoMap,
+    barChart,
+    rcpBarChart,
+    "Country",
+    false
   );
 }
 
-function createDropdown(id, labelText, options, geoMap, barChart, filterType) {
+function createDropdown(
+  id,
+  labelText,
+  options,
+  geoMap,
+  barChart,
+  rcpBarChart,
+  filterType,
+  insertAtBeginning
+) {
   const controlsDiv = d3
     .select(".interact-card")
-    .append("div")
+    .insert("div", insertAtBeginning ? ":first-child" : null)
     .attr("class", "dropdown mb-3");
 
   controlsDiv
@@ -114,7 +151,7 @@ function createDropdown(id, labelText, options, geoMap, barChart, filterType) {
     .on("change", function () {
       const selectedOption = d3.select(this).property("value");
       currentFilters[filterType] = selectedOption;
-      updateVisualizations(geoMap, barChart);
+      updateVisualizations(geoMap, barChart, rcpBarChart);
     });
 
   select
@@ -127,12 +164,7 @@ function createDropdown(id, labelText, options, geoMap, barChart, filterType) {
     .property("selected", (d) => d === currentFilters[filterType]); // Reflect the current filter state
 }
 
-function updateVisualizations(geoMap, barChart) {
-  console.log(
-    "Applying filters sequentially with current settings:",
-    currentFilters
-  );
-
+function updateVisualizations(geoMap, barChart, rcpBarChart) {
   // Start with the full dataset
   let filteredData = mainData;
 
@@ -157,28 +189,85 @@ function updateVisualizations(geoMap, barChart) {
     );
   }
 
-  // // Apply Temperature Scale; adjust data field based on temperature scale
-  // const temperatureKey =
-  //   currentFilters["temperatureScale"] === "Celsius"
-  //     ? "Temperature C"
-  //     : "Temperature F";
-  // filteredData = filteredData.map((item) => ({
-  //   ...item,
-  //   Temperature: item[temperatureKey],
-  // }));
-
-  // // Finally, apply Probability filter and map to a common key
-  // if (currentFilters["Probability"]) {
-  //   const probabilityKey = probabilityMapping[currentFilters["Probability"]];
-  //   filteredData = filteredData.map((item) => ({
-  //     ...item,
-  //     ProbabilityValue: item[probabilityKey],
-  //   }));
-  // }
-
-  console.log("Filtered Data: ", filteredData);
-
   // Update the visualizations with the fully filtered dataset
-  geoMap.update(filteredData);
-  // AverageTemperatureBarChart.update(filteredData);
+  geoMap.update(filteredData, currentFilters);
+  barChart.update(currentFilters);
+
+  rcpBarChart.update(currentFilters);
+}
+
+// Assuming d3 has already been included in your environment
+function drawColorScale() {
+  const svgWidth = 200,
+    svgHeight = 50;
+  const margin = { top: 10, right: 10, bottom: 10, left: 10 };
+  const width = svgWidth - margin.left - margin.right;
+  const height = svgHeight - margin.top - margin.bottom;
+
+  // Create SVG container
+  const svg = d3
+    .select("#colorScale")
+    .append("svg")
+    .attr("width", svgWidth)
+    .attr("height", svgHeight)
+    .append("g")
+    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+  // Define the color scale
+  const colorScale = d3
+    .scaleLinear()
+    .range(["#4daf4a", "#ffff33", "#e41a1c"]) // green to yellow to red
+    .domain([4.16, 45.33, 86.5]); // Example domain
+
+  // Define the gradient
+  const gradient = svg
+    .append("defs")
+    .append("linearGradient")
+    .attr("id", "gradient")
+    .attr("x1", "0%")
+    .attr("x2", "100%")
+    .attr("y1", "0%")
+    .attr("y2", "0%");
+
+  gradient
+    .selectAll("stop")
+    .data(
+      colorScale.range().map(function (color, i, array) {
+        const position = i / (array.length - 1);
+        return {
+          offset: position * 100 + "%",
+          color: color,
+        };
+      })
+    )
+    .enter()
+    .append("stop")
+    .attr("offset", function (d) {
+      return d.offset;
+    })
+    .attr("stop-color", function (d) {
+      return d.color;
+    });
+
+  // Draw the color rectangle
+  svg
+    .append("rect")
+    .attr("width", width)
+    .attr("height", height - 20)
+    .style("fill", "url(#gradient)");
+
+  // Add min and max labels
+  svg
+    .append("text")
+    .attr("x", 0)
+    .attr("y", height + 5)
+    .style("text-anchor", "start")
+    .text("4.16°C");
+
+  svg
+    .append("text")
+    .attr("x", width)
+    .attr("y", height + 5)
+    .style("text-anchor", "end")
+    .text("86.50°C");
 }

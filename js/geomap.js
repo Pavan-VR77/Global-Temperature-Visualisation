@@ -19,13 +19,13 @@ class GeoMapVisualization {
       .scaleSequential()
       .interpolator(d3.interpolateYlOrRd)
       .domain([-30, 40]);
-
-    // this.selectedCategory = "Mortality Costs";
-    // this.selectedRCP = "RCP 8.5";
-    // this.selectedTimePeriod = "Next 20 Years 2020-2039";
-    // this.selectedProbability = "Median";
-    // this.selectedTemperatureScale = "Celsius";
+    this.currentFilters = null;
     this.initVis();
+    this.probabilityMapping = {
+      Median: "P50th",
+      "1-In-2 Low": "P5th",
+      "1-In-20 High": "P95th",
+    };
   }
 
   /**
@@ -43,10 +43,19 @@ class GeoMapVisualization {
       vis.config.margin.top -
       vis.config.margin.bottom;
 
-    d3.select(vis.config.parentElement)
-      .append("h2")
-      .style("text-align", "center")
-      .text("Geo Map");
+    vis.tooltip = d3
+      .select("body")
+      .append("div")
+      .attr("class", "tooltip")
+      .style("position", "absolute")
+      .style("visibility", "hidden")
+      .style("background-color", "white")
+      .style("padding", "10px")
+      .style("border", "1px solid #ccc")
+      .style("z-index", "2")
+      .style("border-radius", "5px");
+
+    this.createLegend();
     let mainDiv = d3.select(vis.config.parentElement);
     vis.svg = d3
       .select(vis.config.parentElement)
@@ -59,32 +68,91 @@ class GeoMapVisualization {
         "transform",
         `translate(${vis.config.margin.left},${vis.config.margin.top})`
       );
-    console.log("Country", this.data);
-
-    console.log("Country", [
-      ...new Set(
-        this.geojsonData.features.map((item) => item["properties"]["name"])
-      ),
-    ]);
     this.renderVis();
   }
 
-  update(data) {
+  createLegend() {
+    let vis = this;
+    const legendWidth = 150,
+      legendHeight = 20;
+
+    vis.legend = d3
+      .select(".interact-card")
+      .append("svg")
+      .style("margin", "0.4rem")
+      .attr("width", 200)
+      .attr("height", 50)
+      .append("g")
+      .attr("transform", "translate(0,0)");
+
+    const defs = vis.legend.append("defs");
+    const linearGradient = defs
+      .append("linearGradient")
+      .attr("id", "linear-gradient");
+
+    linearGradient
+      .selectAll("stop")
+      .data(
+        vis.colorScale.ticks().map((t, i, n) => ({
+          offset: `${(100 * i) / n.length}%`,
+          color: vis.colorScale(t),
+        }))
+      )
+      .enter()
+      .append("stop")
+      .attr("offset", (d) => d.offset)
+      .attr("stop-color", (d) => d.color);
+
+    vis.legend
+      .append("rect")
+      .attr("width", legendWidth)
+      .attr("height", legendHeight)
+      .attr("transform", "translate(25,0)")
+      .style("fill", "url(#linear-gradient)");
+
+    // Add legend text
+    vis.legend
+      .append("text")
+      .attr("class", "legend-text")
+      .attr("x", -2)
+      .attr("y", 17)
+      .text(d3.min(vis.colorScale.domain()));
+
+    vis.legend
+      .append("text")
+      .attr("class", "legend-text")
+      .attr("x", 195)
+      .attr("y", 17)
+      .attr("text-anchor", "end")
+      .text(d3.max(vis.colorScale.domain()));
+  }
+
+  update(data, currentFilters) {
     this.data = data; // Update the data with the filtered dataset
-    this.renderVis(); // Re-render visualization with new data
+    this.currentFilters = currentFilters;
     this.fitleredData = data.reduce((acc, item) => {
       acc[item.Country] = item;
       return acc;
     }, {});
-    console.log(
-      "d3 extent",
-      d3.extent(data.map((item) => item["Temperature C"]))
-    );
+
     this.colorScale = d3
       .scaleSequential()
       .interpolator(d3.interpolateYlOrRd)
-      .domain(d3.extent(data.map((item) => item["Temperature C"])));
-    console.log("letest this.fitleredData ", this.fitleredData);
+      .domain(
+        d3.extent(
+          data.map((item) =>
+            currentFilters &&
+            this.probabilityMapping[currentFilters["Probability"]] &&
+            item[this.probabilityMapping[currentFilters["Probability"]]]
+              ? Number(
+                  item[this.probabilityMapping[currentFilters["Probability"]]]
+                ) + item["Temperature C"]
+              : item["Temperature C"]
+          )
+        )
+      );
+
+    this.renderVis(); // Re-render visualization with new data
   }
 
   /**
@@ -99,58 +167,66 @@ class GeoMapVisualization {
     const path = d3.geoPath().projection(projection);
     vis.svg
       .selectAll("path")
-      .data(this.geojsonData.features)
+      .data(vis.geojsonData.features)
       .join("path")
       .attr("d", path)
       .attr("fill", (d) => {
         const countryName = d.properties.name;
-        // console.log("first", vis.fitleredData);
+
         if (vis.fitleredData == null) {
           return "#FF0";
         }
         if (!vis.fitleredData[countryName]) {
-          // console.error("No data for:", countryName);
           return "#FF7"; // Default color when data is missing
         }
-        return vis.colorScale(vis.fitleredData[countryName]["Temperature C"]);
+
+        return vis.colorScale(
+          vis.currentFilters &&
+            this.probabilityMapping[vis.currentFilters["Probability"]] &&
+            vis.fitleredData[countryName][
+              this.probabilityMapping[vis.currentFilters["Probability"]]
+            ]
+            ? Number(
+                vis.fitleredData[countryName][
+                  this.probabilityMapping[vis.currentFilters["Probability"]]
+                ]
+              ) + vis.fitleredData[countryName]["Temperature C"]
+            : vis.fitleredData[countryName]["Temperature C"]
+        );
       })
-      .attr("stroke", "black");
-    // let dataToUse = vis.filteredData || vis.data;
-    // vis.svg
-    //   .selectAll(".line")
-    //   .data(dataToUse)
-    //   .join("path")
-    //   .attr("class", (d) => `line ${d.species.replaceAll(" ", "_")}`)
-    //   .attr("d", (d) => {
-    //     return d3.line()(
-    //       vis.dimensions.map((dim) => {
-    //         const x =
-    //           (vis.width / vis.dimensions.length) *
-    //             vis.dimensions.indexOf(dim) +
-    //           vis.width / vis.dimensions.length / 2 -
-    //           93;
-    //         const y = vis.yScales[dim](d[dim]);
-    //         return [x, y];
-    //       })
-    //     );
-    //   })
-    //   .style("fill", "none")
-    //   .style("stroke", (d) => vis.colorScale(d.species))
-    //   .style("stroke-opacity", 0.5)
-    //   .on("mouseover", function (event, d) {
-    //     d3.select("#barchart")
-    //       .selectAll(".bar")
-    //       .style("fill-opacity", (bar) => (bar.species === d.species ? 1 : 0.5))
-    //       .style("stroke-width", (bar) => (bar.species === d.species ? 2 : 0))
-    //       .style("stroke", (bar) =>
-    //         bar.species === d.species ? "black" : "none"
-    //       );
-    //   })
-    //   .on("mouseleave", function () {
-    //     d3.select("#barchart")
-    //       .selectAll(".bar")
-    //       .style("fill-opacity", 1)
-    //       .style("stroke-width", 0);
-    //   });
+      .attr("opacity", "0.8")
+      .attr("stroke", "black")
+      .on("mouseover", function (event, d) {
+        d3.select(this).attr("stroke-width", 3);
+        d3.select(this).attr("opacity", 1);
+        const countryData =
+          vis.fitleredData && d.properties.name in vis.fitleredData
+            ? vis.fitleredData[d.properties.name]
+            : null;
+
+        if (countryData) {
+          vis.tooltip
+            .style("visibility", "visible")
+            .html(
+              `<div><strong>Country:</strong> ${d.properties.name}<br>
+                 <strong>Temperature:</strong> ${countryData["Temperature"]} <br>
+                 <strong>Emissions:</strong>  ${countryData["Emissions"]}<br>
+                 <strong>Time Period:</strong> ${countryData["Time Period"]} <br>
+                 </div>`
+            )
+            .style("top", event.pageY - 10 + "px")
+            .style("left", event.pageX + 10 + "px");
+        }
+      })
+      .on("mousemove", function (event) {
+        vis.tooltip
+          .style("top", event.pageY - 10 + "px")
+          .style("left", event.pageX + 10 + "px");
+      })
+      .on("mouseout", function () {
+        d3.select(this).attr("stroke-width", 1);
+        d3.select(this).attr("opacity", "0.8");
+        vis.tooltip.style("visibility", "hidden");
+      });
   }
 }
